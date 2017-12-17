@@ -456,3 +456,125 @@ Returns 0 on success, or a positive error number on error
 If
 the time interval specified by abstime expires without the condition variable being
 signaled, then pthread_cond_timedwait() returns the error ETIMEDOUT .
+
+### Thread Specific Data
+The general steps that a library function performs in order to use thread-specific
+data are as follows:
+660
+1. The function creates a key, which is the means of differentiating the thread-specific
+data item used by this function from the thread-specific data items used by
+other functions. The key is created by calling the pthread_key_create() function.
+Creating a key needs to be done only once, when the first thread calls the function.
+For this purpose, pthread_once() is employed. Creating a key doesn’t allocate
+any blocks of thread-specific data.
+- The call to pthread_key_create() serves a second purpose: it allows the caller to
+specify the address of the programmer-defined destructor function that is used
+to deallocate each of the storage blocks allocated for this key (see the next
+step). When a thread that has thread-specific data terminates, the Pthreads API
+automatically invokes the destructor, passing it a pointer to the data block for
+this thread.
+- The function allocates a thread-specific data block for each thread from which
+it is called. This is done using malloc() (or a similar function). This allocation is
+done once for each thread, the first time the thread calls the function.
+- In order to save a pointer to the storage allocated in the previous step, the func-
+tion employs two Pthreads functions: pthread_setspecific() and pthread_getspecific().
+A call to pthread_setspecific() is a request to the Pthreads implementation to say
+“save this pointer, recording the fact that it is associated with a particular key (the
+one for this function) and a particular thread (the calling thread).” Calling
+pthread_getspecific() performs the complementary task, returning the pointer pre-
+viously associated with a given key for the calling thread. If no pointer was
+previously associated with a particular key and thread, then pthread_getspecific()
+returns NULL . This is how a function can determine that it is being called for the
+first time by this thread, and thus must allocate the storage block for the thread.
+~~~~
+#include <pthread.h>
+int pthread_key_create(pthread_key_t * key , void (* destructor )(void *));
+Returns 0 on success, or a positive error number on error
+~~~~
+Upon termination of a thread that has a non- NULL value associated with key, the
+destructor function is automatically invoked by the Pthreads API and given that
+value as its argument. The passed value is normally a pointer to this thread’s
+thread-specific data block for this key. If a destructor is not required, then destructor
+can be specified as NULL
+
+The pthread_setspecific() function requests the Pthreads API to save a copy of value
+in a data structure that associates it with the calling thread and with key, a key
+returned by a previous call to pthread_key_create(). The pthread_getspecific() function
+performs the converse operation, returning the value that was previously associ-
+ated with the given key for this thread.
+~~~~
+#include <pthread.h>
+int pthread_setspecific(pthread_key_t key , const void * value );
+Returns 0 on success, or a positive error number on error
+void *pthread_getspecific(pthread_key_t key );
+// Returns pointer, or NULL if no thread-specific data isassociated with key
+~~~~
+
+### Cleanup Handlers
+If a thread with a pending cancellation were simply terminated when it reached a
+cancellation point, then shared variables and Pthreads objects (e.g., mutexes)
+might be left in an inconsistent state, perhaps causing the remaining threads in the
+process to produce incorrect results, deadlock, or crash. To get around this problem,
+a thread can establish one or more cleanup handlers—functions that are automati-
+cally executed if the thread is canceled. A cleanup handler can perform tasks such
+as modifying the values of global variables and unlocking mutexes before the
+thread is terminated.
+Each thread can have a stack of cleanup handlers. When a thread is canceled,
+the cleanup handlers are executed working down from the top of the stack; that is,
+the most recently established handler is called first, then the next most recently
+established, and so on. When all of the cleanup handlers have been executed, the
+thread terminates.
+The pthread_cleanup_push() and pthread_cleanup_pop() functions respectively
+add and remove handlers on the calling thread’s stack of cleanup handlers.
+~~~
+#include <pthread.h>
+void pthread_cleanup_push(void (* routine )(void*), void * arg );
+void pthread_cleanup_pop(int execute );
+The pthread_cleanup_push() function adds the function whose address is specified
+in routine to the top of the calling thread’s stack of cleanup handlers
+~~~
+
+### Sending a Signal to a Thread
+The pthread_kill() function sends the signal sig to another thread in the same process.
+The target thread is identified by the argument thread.
+~~~~
+#include <signal.h>
+int pthread_kill(pthread_t thread , int sig );
+Returns 0 on success, or a positive error number on error
+~~~~
+
+### Threads and exec()
+When any thread calls one of the exec() functions, the calling program is completely
+replaced. All threads, except the one that called exec(), vanish immediately. None of
+the threads executes destructors for thread-specific data or calls cleanup handlers.
+All of the (process-private) mutexes and condition variables belonging to the process
+also disappear. After an exec(), the thread ID of the remaining thread is unspecified.
+
+### Threads and fork()
+When a multithreaded process calls fork(), only the calling thread is replicated in
+the child process. (The ID of the thread in the child is the same as the ID of the
+thread that called fork() in the parent.) All of the other threads vanish in the child;
+no thread-specific data destructors or cleanup handlers are executed for those
+threads
+
+### Persistence
+The term persistence refers to the lifetime of an IPC object. <br />
+**Process persistence**: A process-persistent IPC object remains in existence only as
+long as it is held open by at least one process. If the object is closed by all pro-
+cesses, then all kernel resources associated with the object are freed, and any
+unread data is destroyed. Pipes, FIFOs, and sockets are examples of IPC facilities
+with process persistence. <br />
+**Kernel persistence**: A kernel-persistent IPC object exists until either it is explicitly
+deleted or the system is shut down. The lifetime of the object is independent of
+whether any process holds the object open. This means that, for example, one
+process can create an object, write data to it, and then close it (or terminate).
+At a later point, another process can open the object and read the data.<br />
+**File-system persistence**: An IPC object with file-system persistence retains its infor-
+mation even when the system is rebooted. The object exists until it is explicitly
+deleted. The only type of IPC object that demonstrates file-system persistence
+is shared memory based on a memory-mapped file.
+
+- communication facilities provided on Linux are pipes, FIFOs, sockets,
+message queues, and shared memory.
+- Synchronization facilities provided on Linux
+include semaphores and file locks.

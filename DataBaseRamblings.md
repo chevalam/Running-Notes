@@ -41,42 +41,34 @@ This type of index reorders the physical order of the table and search based on 
 NonClustered Index does not alter the physical order of the table and maintains logical order of data. Each table can have 999 nonclustered indexes.
 
 
-### Thread Specific Data
-The general steps that a library function performs in order to use thread-specific
-data are as follows:
-660
-1. The function creates a key, which is the means of differentiating the thread-specific
-data item used by this function from the thread-specific data items used by
-other functions. The key is created by calling the pthread_key_create() function.
-Creating a key needs to be done only once, when the first thread calls the function.
-For this purpose, pthread_once() is employed. Creating a key doesn’t allocate
-any blocks of thread-specific data.
-- The call to pthread_key_create() serves a second purpose: it allows the caller to
-specify the address of the programmer-defined destructor function that is used
-to deallocate each of the storage blocks allocated for this key (see the next
-step). When a thread that has thread-specific data terminates, the Pthreads API
-automatically invokes the destructor, passing it a pointer to the data block for
-this thread.
-- The function allocates a thread-specific data block for each thread from which
-it is called. This is done using malloc() (or a similar function). This allocation is
-done once for each thread, the first time the thread calls the function.
-- In order to save a pointer to the storage allocated in the previous step, the func-
-tion employs two Pthreads functions: pthread_setspecific() and pthread_getspecific().
-A call to pthread_setspecific() is a request to the Pthreads implementation to say
-“save this pointer, recording the fact that it is associated with a particular key (the
-one for this function) and a particular thread (the calling thread).” Calling
-pthread_getspecific() performs the complementary task, returning the pointer pre-
-viously associated with a given key for the calling thread. If no pointer was
-previously associated with a particular key and thread, then pthread_getspecific()
-returns NULL . This is how a function can determine that it is being called for the
-first time by this thread, and thus must allocate the storage block for the thread.
-~~~~
-#include <pthread.h>
-int pthread_key_create(pthread_key_t * key , void (* destructor )(void *));
-Returns 0 on success, or a positive error number on error
-~~~~
-Upon termination of a thread that has a non- NULL value associated with key, the
-destructor function is automatically invoked by the Pthreads API and given that
-value as its argument. The passed value is normally a pointer to this thread’s
-thread-specific data block for this key. If a destructor is not required, then destructor
-can be specified as NULL
+
+### Design question :
+Usual design question has to be answered around these items :
+1. Abstraction. It’s a very important topic for system design interview. You should be clear about how to abstract a system, what is visible and invisible from other components, and what is the logic behind it. Object oriented programming is also important to know.
+- Database. You should be clear about those basic concepts like relational database. Knowing about No-SQL might be a plus depends on your level (new grads or experienced engineers).
+- Network. You should be able to explain clearly what happened when you type “gainlo.co” in your browser, things like DNS lookup, HTTP request should be clear.
+- Concurrency. It will be great if you can recognize concurrency issue in a system and tell the interviewer how to solve it. Sometimes this topic can be very hard, but knowing about basic concepts like race condition, dead lock is the bottom line.
+- Operating system. Sometimes your discussion with the interviewer can go very deeply and at this point it’s better to know how OS works in the low level.
+- Machine learning (optional). You don’t need to be an expert, but again some basic concepts like feature selection, how ML algorithm works in general are better to be familiar with.
+
+
+### what happens when a url is typed:
+In an extremely rough and simplified sketch, assuming the simplest possible HTTP request, no proxies, IPv4 and no problems in any step:
+1. browser checks cache; if requested object is in cache and is fresh, skip to #9
+browser asks OS for server's IP address
+- OS makes a DNS lookup and replies the IP address to the browser
+- browser opens a TCP connection to server (this step is much more complex with HTTPS)
+- browser sends the HTTP request through TCP connection
+- browser receives HTTP response and may close the TCP connection, or reuse it for another request
+- browser checks if the response is a redirect or a conditional response (3xx result status codes), authorization request (401), error (4xx and 5xx), etc.; these are handled differently from normal responses (2xx)
+- if cacheable, response is stored in cache
+- browser decodes response (e.g. if it's gzipped)
+- browser determines what to do with response (e.g. is it a HTML page, is it an image, is it a sound clip?)
+- browser renders response, or offers a download dialog for unrecognized types
+
+
+The company is structured around two areas: its global distribution system and its IT Solutions business area. Acting as an international network, Amadeus provides search, pricing, booking, ticketing and other processing services in real-time to travel providers and travel agencies through its Amadeus CRS distribution business area. Through its IT Solutions business area, it also offers travel companies software systems which automate processes such as reservations, inventory management and departure control.
+
+The group, which processed 850 million billable travel transactions in 2010,[2] services customers including airlines, hotels, tour operators, insurers, car rental and railway companies, ferry and cruise lines, travel agencies and individual travellers directly.
+
+**ACID (Atomicity, Consistency, Isolation, Durability)** is a set of properties of database transactions intended to guarantee validity even in the event of errors, power failures, etc. In the context of databases, a sequence of database operations that satisfies the ACID properties, and thus can be perceived as a single logical operation on the data, is called a transaction. For example, a transfer of funds from one bank account to another, even involving multiple changes such as debiting one account and crediting another, is a single transaction.
